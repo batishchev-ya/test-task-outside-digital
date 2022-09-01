@@ -8,7 +8,41 @@ const {
   validatePassword,
   validateEmail,
   validateNickname,
-} = require('./utilsController/checkData');
+} = require('./utilsController/validateTemplates');
+
+// const validateAndDuplicateCheck = async (data, dataType, baseName, next) => {
+//   let validateFunction;
+
+//   if (dataType == 'email') {
+//     validateFunction = validateEmail;
+//   }
+//   if (dataType == 'nickname') {
+//     validateFunction = validateNickname;
+//   }
+//   // if(dataType =='tag'){
+//   //   validateFunction = validateNickname
+//   // }
+
+//   if (!validateFunction(data)) {
+//     return next(
+//       new AppError({ message: `Invalid ${dataType}`, statusCode: 400 })
+//     );
+//   }
+//   const oldData = (
+//     await db.query(
+//       `select uid from usertags.${baseName} where ${dataType}=$1`,
+//       [data]
+//     )
+//   ).rows[0];
+//   if (oldData) {
+//     return next(
+//       new AppError({
+//         message: `This ${dataType} already exists`,
+//         statusCode: 400,
+//       })
+//     );
+//   }
+// };
 
 exports.getUser = catchAsync(async (req, res, next) => {
   const userUid = req.userUid;
@@ -52,21 +86,20 @@ exports.updateUser = catchAsync(async (req, res, next) => {
     );
   }
 
-  const user = (
-    await db.query('select * from usertags.users where uid=$1', [userUid])
-  ).rows[0];
-
   if (email) {
     if (!validateEmail(email)) {
       return next(new AppError({ message: 'Invalid email', statusCode: 400 }));
     }
-    if (email == user.email) {
+    const oldEmail = (
+      await db.query('select uid from usertags.users where email=$1', [email])
+    ).rows[0];
+    if (oldEmail) {
       return next(
         new AppError({ message: 'This email already exists', statusCode: 400 })
       );
     }
     queryOptions.push(email);
-    stringQuery = `email=$${queryOptions.length},`;
+    stringQuery += ` email=$${queryOptions.length},`;
   }
 
   if (password) {
@@ -80,7 +113,7 @@ exports.updateUser = catchAsync(async (req, res, next) => {
     }
     const passwordHashed = await bcrypt.hash(password, 12);
     queryOptions.push(passwordHashed);
-    stringQuery += `password=$${queryOptions.length},`;
+    stringQuery += ` password=$${queryOptions.length},`;
   }
 
   if (nickname) {
@@ -89,7 +122,13 @@ exports.updateUser = catchAsync(async (req, res, next) => {
         new AppError({ message: 'Invalid nickname', statusCode: 400 })
       );
     }
-    if (nickname == user.nickname) {
+    const oldNickname = (
+      await db.query('select uid from usertags.users where nickname=$1', [
+        nickname,
+      ])
+    ).rows[0];
+
+    if (oldNickname) {
       return next(
         new AppError({
           message: 'This nickname already exists',
@@ -97,16 +136,21 @@ exports.updateUser = catchAsync(async (req, res, next) => {
         })
       );
     }
+
     queryOptions.push(nickname);
-    stringQuery += `nickname=$${queryOptions.length},`;
+    stringQuery += ` nickname=$${queryOptions.length},`;
   }
 
   let stringQuerySliced = stringQuery.slice(0, -1);
   queryOptions.push(userUid);
-  stringQuerySliced += ` where uid=$${queryOptions.length}`;
+  stringQuerySliced += ` where uid=$${queryOptions.length} `;
 
   const finalStringQuery =
-    'update usertags.users set ' + stringQuerySliced + 'returning *';
+    'update usertags.users set ' +
+    stringQuerySliced +
+    'returning email, nickname';
+  // console.log(finalStringQuery);
+
   const updatedRows = (await db.query(finalStringQuery, queryOptions)).rows[0];
 
   return res.status(200).json({

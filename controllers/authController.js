@@ -6,7 +6,7 @@ const {
   validatePassword,
   validateEmail,
   validateNickname,
-} = require('./utilsController/checkData');
+} = require('./utilsController/validateTemplates');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const db = require('../db/index');

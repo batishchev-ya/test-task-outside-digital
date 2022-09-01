@@ -7,6 +7,6 @@ const router = express.Router();
 router.use(authController.protect);
 
 router.route('/').post(tagController.createTag);
-router.route('/:id').get(tagController.getTag);
+router.route('/:id').get(tagController.getTag).put(tagController.updateTag);
 
 module.exports = router;
