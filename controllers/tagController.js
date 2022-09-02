@@ -26,9 +26,9 @@ exports.createTag = catchAsync(async (req, res, next) => {
       })
     );
   }
-  const oldTag = (
-    await db.query('select name from usertags.tags where name=$1', [name])
-  ).rows[0];
+  const oldTag = (await db.selectQuery('tags', ['name'], ['name'], [name]))
+    .rows[0];
+  // await db.selectQuery(['name'], 'tags', ['name'], [name]);
   if (oldTag) {
     return next(
       new AppError({ message: 'This tag already exists', statusCode: 400 })
@@ -50,7 +50,7 @@ exports.createTag = catchAsync(async (req, res, next) => {
     ') returning id, name, sortorder';
 
   const newTag = (await db.query(queryString, optionsQuery)).rows[0];
-  console.log(newTag.id);
+  // console.log(newTag.id);
 
   await db.query(
     'update usertags.usertags set tags=array_append(tags, $1) where user_id=$2',
@@ -65,10 +65,12 @@ exports.createTag = catchAsync(async (req, res, next) => {
 
 exports.getTag = catchAsync(async (req, res, next) => {
   const tagId = req.params.id;
-  console.log(tagId);
+  // console.log(tagId);
   const tag = (
-    await db.query(
-      'select creator, name, sortorder from usertags.tags where id=$1',
+    await db.selectQuery(
+      'tags',
+      ['creator', 'name', 'sortorder'],
+      ['id'],
       [tagId]
     )
   ).rows[0];
@@ -80,29 +82,44 @@ exports.getTag = catchAsync(async (req, res, next) => {
   }
 
   const creator = (
-    await db.query('select nickname, uid from usertags.users where uid=$1', [
-      tag.creator,
-    ])
+    await db.selectQuery('users', ['nickname', 'uid'], ['uid'], [tag.creator])
   ).rows[0];
 
-  return res.status(200).json({
-    creator,
-    name: tag.name,
-    sortorder: tag.sortorder,
-  });
+  let jsonResponse;
+  if (!creator) {
+    jsonResponse = {
+      creator: 'User has been deleted',
+      name: tag.name,
+      sortorder: tag.sortorder,
+    };
+  } else {
+    jsonResponse = {
+      creator,
+      name: tag.name,
+      sortorder: tag.sortorder,
+    };
+  }
+
+  return res.status(200).json(jsonResponse);
 });
+
+exports.getAllTags = (req, res, next) => {
+  console.log(req.query);
+  // 'SELECT * from usertags.users order by nickname asc offset 4'
+};
 
 exports.updateTag = catchAsync(async (req, res, next) => {
   const { sortorder, name } = req.body;
-  console.log(sortorder);
+  // console.log(sortorder);
   const tagId = req.params.id;
   const userUid = req.userUid;
   let stringQuery = '';
   let optionsQuery = [];
 
-  const tag = (
-    await db.query('select id, creator from usertags.tags where id=$1', [tagId])
-  ).rows[0];
+  const tag =
+    // await db.query('select id, creator from usertags.tags where id=$1', [tagId])
+    (await db.selectQuery('tags', ['id', 'creator'], ['id'], [tagId])).rows[0];
+
   if (!tag) {
     return next(
       new AppError({ message: ' No tag founded with this id', statusCode: 400 })
@@ -130,9 +147,10 @@ exports.updateTag = catchAsync(async (req, res, next) => {
         })
       );
     }
-    const oldTag = (
-      await db.query('select name from usertags.tags where name=$1', [name])
-    ).rows[0];
+    const oldTag =
+      // await db.query('select name from usertags.tags where name=$1', [name])
+      (await db.selectQuery('tags', ['name'], ['name'], [name])).rows[0]
+        .rows[0];
     if (oldTag) {
       return next(
         new AppError({ message: 'This tag already exists', statusCode: 400 })
@@ -161,15 +179,16 @@ exports.updateTag = catchAsync(async (req, res, next) => {
     'update usertags.tags set ' +
     stringQuerySliced +
     'returning name, sortorder';
-  console.log(finalStringQuery);
-  console.log(optionsQuery);
+  // console.log(finalStringQuery);
+  // console.log(optionsQuery);
   const updatedRows = (await db.query(finalStringQuery, optionsQuery)).rows[0];
 
-  const creator = (
-    await db.query('select nickname, uid from usertags.users where uid=$1', [
-      tag.creator,
-    ])
-  ).rows[0];
+  const creator =
+    // await db.query('select nickname, uid from usertags.users where uid=$1', [
+    //   tag.creator,
+    // ])
+    (await db.selectQuery('users', ['nickname', 'uid'], ['uid'], [tag.creator]))
+      .rows[0];
 
   return res.status(200).json({
     creator,
@@ -177,3 +196,5 @@ exports.updateTag = catchAsync(async (req, res, next) => {
     sortorder: updatedRows.sortorder,
   });
 });
+
+exports.deleteTag = (req, res, next) => {};

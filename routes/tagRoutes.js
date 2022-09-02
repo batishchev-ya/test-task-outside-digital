@@ -6,7 +6,11 @@ const router = express.Router();
 
 router.use(authController.protect);
 
-router.route('/').post(tagController.createTag);
-router.route('/:id').get(tagController.getTag).put(tagController.updateTag);
+router.route('/').post(tagController.createTag).get(tagController.getAllTags);
+router
+  .route('/:id')
+  .get(tagController.getTag)
+  .put(tagController.updateTag)
+  .delete(tagController.deleteTag);
 
 module.exports = router;
