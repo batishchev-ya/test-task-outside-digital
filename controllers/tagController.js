@@ -8,7 +8,7 @@ exports.createTag = catchAsync(async (req, res, next) => {
   const userUid = req.userUid;
   const { name, sortorder } = req.body;
 
-  let optionsQuery = [];
+  const optionsQuery = [];
   let stringQueryColumns = '';
   let stringQueryValues = '';
 
@@ -41,7 +41,7 @@ exports.createTag = catchAsync(async (req, res, next) => {
     stringQueryValues = ', $3';
     optionsQuery.push(sortorder);
   }
-
+  // TODO: make template string instaed of Concatenation
   const queryString =
     'insert into usertags.tags(creator, name' +
     stringQueryColumns +
@@ -122,7 +122,7 @@ exports.updateTag = catchAsync(async (req, res, next) => {
 
   if (!tag) {
     return next(
-      new AppError({ message: ' No tag founded with this id', statusCode: 400 })
+      new AppError({ message: ' No tag founded with this id', statusCode: 404 })
     );
   }
 
@@ -151,6 +151,7 @@ exports.updateTag = catchAsync(async (req, res, next) => {
       // await db.query('select name from usertags.tags where name=$1', [name])
       (await db.selectQuery('tags', ['name'], ['name'], [name])).rows[0]
         .rows[0];
+    // TODO: return not 'return next(new AppError)' but 'return new AppError' and if main function 'if(err)=>next(err)'
     if (oldTag) {
       return next(
         new AppError({ message: 'This tag already exists', statusCode: 400 })
