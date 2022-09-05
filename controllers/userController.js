@@ -161,9 +161,11 @@ exports.updateUser = catchAsync(async (req, res, next) => {
 
 exports.deleteUser = catchAsync(async (req, res, next) => {
   const userUid = req.userUid;
-  const deletedRows = (
-    await db.query('delete from usertags.users where uid=$1', [userUid])
-  ).rows[0];
+  await db.query('Begin');
+  await db.query('delete from usertags.tags where creator=$1', [userUid]);
+  await db.query('delete from usertags.users where uid=$1', [userUid]);
+  await db.query('delete from usertags.usertags where user_id=$1', [userUid]);
+  await db.query('Commit');
 
   req.userUid = undefined;
 

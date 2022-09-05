@@ -52,10 +52,10 @@ exports.createTag = catchAsync(async (req, res, next) => {
   const newTag = (await db.query(queryString, optionsQuery)).rows[0];
   // console.log(newTag.id);
 
-  await db.query(
-    'update usertags.usertags set tags=array_append(tags, $1) where user_id=$2',
-    [newTag.id, userUid]
-  );
+  await db.query('update usertags.usertags set tags= $1 where user_id=$2', [
+    newTag.id,
+    userUid,
+  ]);
   return res.status(200).json({
     id: newTag.id,
     name: newTag.name,
