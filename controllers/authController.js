@@ -62,6 +62,7 @@ exports.signin = catchAsync(async (req, res, next) => {
 
   const passwordHashed = await bcrypt.hash(password, 12);
 
+  await db.query('Begin');
   const userUid = (
     await db.query(
       'insert into usertags.users(email, password, nickname) values ($1, $2, $3) returning uid;',
@@ -73,7 +74,7 @@ exports.signin = catchAsync(async (req, res, next) => {
   await db.query('insert into usertags.usertags(user_id) values($1);', [
     userUid,
   ]);
-
+  await db.query('Commit');
   // --------------------------------------------------------------------------------------------
   // const userUid = await db.query(
   //   `begin;

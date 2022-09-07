@@ -2,6 +2,7 @@ const db = require('../db/index');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const { validateTagName } = require('./utilsController/validateTemplates');
+const APIFeatures = require('../utils/APIFeatures');
 // TODO: Make function for duplication checking and validating data (email, nickname, etc...)
 
 exports.createTag = catchAsync(async (req, res, next) => {
@@ -36,7 +37,7 @@ exports.createTag = catchAsync(async (req, res, next) => {
   }
 
   optionsQuery.push(name);
-  if (sortorder) {
+  if (sortorder != undefined) {
     stringQueryColumns = ', sortorder';
     stringQueryValues = ', $3';
     optionsQuery.push(sortorder);
@@ -103,10 +104,29 @@ exports.getTag = catchAsync(async (req, res, next) => {
   return res.status(200).json(jsonResponse);
 });
 
-exports.getAllTags = (req, res, next) => {
-  console.log(req.query);
-  // 'SELECT * from usertags.users order by nickname asc offset 4'
-};
+exports.getAllTags = catchAsync(async (req, res, next) => {
+  const queryRaw = req.query;
+  const queryString = new APIFeatures(queryRaw).getQueryString();
+  // const queryString = query.query();
+  console.log(queryString);
+  const tags = (
+    await db.query(
+      `select id, name, creator, sortorder from usertags.tags ${queryString}`
+    )
+  ).rows;
+  console.log(tags);
+  // 'SELECT * from usertags.users limit 2 order by nickname asc offset 4'
+  // 'SELECT * from usertags.tags  order by name limit 4 OFFSET 3'
+  // 'select * from usertags.tags where creator='e097e7ff-9b34-4503-a91d-6eb6e982e562''
+  return res.status(200).json({
+    data: tags,
+    meta: {
+      offset: req.query.offset,
+      length: req.query.length,
+      quantity: tags.length,
+    },
+  });
+});
 
 exports.updateTag = catchAsync(async (req, res, next) => {
   const { sortorder, name } = req.body;
