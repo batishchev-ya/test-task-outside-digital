@@ -67,11 +67,19 @@ exports.createTag = catchAsync(async (req, res, next) => {
 exports.getTag = catchAsync(async (req, res, next) => {
   const tagId = req.params.id;
   // console.log(tagId);
+
   const tag = (
-    await db.selectQuery(
-      'tags',
-      ['creator', 'name', 'sortorder'],
-      ['id'],
+    await db.query(
+      `select json_build_object(
+        'id',usertags.tags.id,
+        'name',usertags.tags.name,
+        'creator' , json_build_object(
+          'uid',usertags.users.uid,
+          'nickname', usertags.users.nickname
+        )  
+      ) 	from usertags.tags 
+      join usertags.users ON tags.creator = users.uid
+      where tags.id=$1`,
       [tagId]
     )
   ).rows[0];
@@ -82,26 +90,8 @@ exports.getTag = catchAsync(async (req, res, next) => {
     );
   }
 
-  const creator = (
-    await db.selectQuery('users', ['nickname', 'uid'], ['uid'], [tag.creator])
-  ).rows[0];
-
-  let jsonResponse;
-  if (!creator) {
-    jsonResponse = {
-      creator: 'User has been deleted',
-      name: tag.name,
-      sortorder: tag.sortorder,
-    };
-  } else {
-    jsonResponse = {
-      creator,
-      name: tag.name,
-      sortorder: tag.sortorder,
-    };
-  }
-
-  return res.status(200).json(jsonResponse);
+  const tagProcessed = tag.json_build_object;
+  return res.status(200).json(tagProcessed);
 });
 
 exports.getAllTags = catchAsync(async (req, res, next) => {
@@ -109,23 +99,70 @@ exports.getAllTags = catchAsync(async (req, res, next) => {
   const queryString = new APIFeatures(queryRaw).getQueryString();
   // const queryString = query.query();
   console.log(queryString);
+  // const tags = (
+  //   await db.query(
+  //     `select id, name, creator, sortorder from usertags.tags ${queryString}`
+  //   )
+  // ).rows;
+
+  // ------------
+  // const tags = (
+  //   await db.query(`select json_build_object(
+  //     'id',usertags.tags.id,
+  //   'name',usertags.tags.name,
+  //   'creator' , json_build_object(
+  //     'uid',usertags.users.uid,
+  //     'nickname', usertags.users.nickname
+  //   )
+  // ) 	from usertags.tags
+  //   join usertags.users ON tags.creator = users.uid ${queryString}`)
+  // ).rows;
+  // -------
   const tags = (
-    await db.query(
-      `select id, name, creator, sortorder from usertags.tags ${queryString}`
-    )
-  ).rows;
-  console.log(tags);
+    await db.query(`select json_build_object(
+
+    'data', json_agg(tags1)) as all_tags
+
+    from(				
+      select json_build_object(
+      'id',usertags.tags.id,
+      'name',usertags.tags.name,
+      'creator' , json_build_object(
+        'uid',usertags.users.uid,
+        'nickname', usertags.users.nickname
+      )  
+    ) 	tags1
+    from usertags.tags 
+    join usertags.users ON tags.creator = users.uid
+    ${queryString} ) s `)
+  ).rows[0];
+
+  const tagsProcessed = tags.all_tags;
+  let jsonResponse = tagsProcessed;
+  jsonResponse.meta = {
+    quantity: tagsProcessed.data.length,
+    length: req.query.length,
+    offset: req.query.offset,
+  };
+  // const tags = (
+  //   await db.query(`select id,  name, sortorder, (uid, nickname) as creator from usertags.tags t
+  //   inner join usertags.users u ON u.uid = t.creator`)
+  // ).rows;
+
   // 'SELECT * from usertags.users limit 2 order by nickname asc offset 4'
   // 'SELECT * from usertags.tags  order by name limit 4 OFFSET 3'
   // 'select * from usertags.tags where creator='e097e7ff-9b34-4503-a91d-6eb6e982e562''
-  return res.status(200).json({
-    data: tags,
-    meta: {
-      offset: req.query.offset,
-      length: req.query.length,
-      quantity: tags.length,
-    },
-  });
+
+  // return res.status(200).json({
+  //   data: tags,
+  //   meta: {
+  //     offset: req.query.offset,
+  //     length: req.query.length,
+  //     quantity: tags.length,
+  //   },
+  // });
+
+  return res.status(200).json(jsonResponse);
 });
 
 exports.updateTag = catchAsync(async (req, res, next) => {
