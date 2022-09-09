@@ -3,3 +3,4 @@ test-folder/
 *.env
 createTables.js
 insertData.js
+createTables2.js
