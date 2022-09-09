@@ -47,11 +47,13 @@ const {
 exports.getUser = catchAsync(async (req, res, next) => {
   const userUid = req.userUid;
   // TODO: make one query instead of two
+  await db.query('Begin');
   const user = (
     await db.query('select email, nickname from usertags.users where uid=$1', [
       userUid,
     ])
   ).rows[0];
+
   if (!user) {
     return next(
       new AppError({ message: 'No user founded wtih id', statusCode: 404 })
@@ -63,7 +65,7 @@ exports.getUser = catchAsync(async (req, res, next) => {
       [userUid]
     )
   ).rows;
-
+  await db.query('commit');
   const result = {
     email: user.email,
     nickname: user.nickname,
@@ -149,7 +151,6 @@ exports.updateUser = catchAsync(async (req, res, next) => {
     'update usertags.users set ' +
     stringQuerySliced +
     'returning email, nickname';
-  // console.log(finalStringQuery);
 
   const updatedRows = (await db.query(finalStringQuery, queryOptions)).rows[0];
 

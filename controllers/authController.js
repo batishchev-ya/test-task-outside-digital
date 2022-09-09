@@ -62,7 +62,6 @@ exports.signin = catchAsync(async (req, res, next) => {
 
   const passwordHashed = await bcrypt.hash(password, 12);
 
-  await db.query('Begin');
   const userUid = (
     await db.query(
       'insert into usertags.users(email, password, nickname) values ($1, $2, $3) returning uid;',
@@ -71,19 +70,6 @@ exports.signin = catchAsync(async (req, res, next) => {
     )
   ).rows[0].uid;
 
-  await db.query('insert into usertags.usertags(user_id) values($1);', [
-    userUid,
-  ]);
-  await db.query('Commit');
-  // --------------------------------------------------------------------------------------------
-  // const userUid = await db.query(
-  //   `begin;
-  // with uid_d as(
-  // insert into usertags.users(email, password, nickname) values($1, $2, $3) RETURNING uid)
-  // insert into usertags.usertags(user_id) select uid from uid_d;
-  // commit;`,
-  //   [email, passwordHashed, nickname]
-  // );
   createSendToken(userUid, 200, req, res);
 });
 
@@ -141,13 +127,13 @@ exports.protect = catchAsync(async (req, res, next) => {
 
   const userUid = (
     await db.query('select uid from usertags.users where uid=$1', [decoded.id])
-  ).rows[0].uid;
+  ).rows[0];
 
   if (!userUid) {
     return next(
       new AppError({ message: 'User has been deleted', statusCode: 404 })
     );
   }
-  req.userUid = userUid;
+  req.userUid = userUid.uid;
   next();
 });

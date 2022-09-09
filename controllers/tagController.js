@@ -50,13 +50,16 @@ exports.createTag = catchAsync(async (req, res, next) => {
     stringQueryValues +
     ') returning id, name, sortorder';
 
+  await db.query('Begin');
   const newTag = (await db.query(queryString, optionsQuery)).rows[0];
   // console.log(newTag.id);
 
-  await db.query('update usertags.usertags set tags= $1 where user_id=$2', [
-    newTag.id,
-    userUid,
-  ]);
+  // await db.query(
+  //   'insert into usertags.usertags(tags, user_id ) values($1,$2)',
+  //   [newTag.id, userUid]
+  // );
+  await db.query('Commit');
+
   return res.status(200).json({
     id: newTag.id,
     name: newTag.name,
@@ -98,7 +101,7 @@ exports.getAllTags = catchAsync(async (req, res, next) => {
   const queryRaw = req.query;
   const queryString = new APIFeatures(queryRaw).getQueryString();
   // const queryString = query.query();
-  console.log(queryString);
+  // console.log(queryString);
   // const tags = (
   //   await db.query(
   //     `select id, name, creator, sortorder from usertags.tags ${queryString}`
@@ -255,4 +258,31 @@ exports.updateTag = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.deleteTag = (req, res, next) => {};
+exports.deleteTag = catchAsync(async (req, res, next) => {
+  // console.log(req.params.id);
+  const deletingTagId = req.params.id;
+
+  const deletingTag = (
+    await db.query('select id from usertags.tags where id=$1', [deletingTagId])
+  ).rows[0];
+
+  if (!deletingTag) {
+    return next(
+      new AppError({
+        message: 'Can not find tag with this Id',
+        statusCode: 404,
+      })
+    );
+  }
+
+  await db.query('Begin');
+  await db.query('delete from usertags.tags where id=$1', [deletingTagId]);
+  await db.query('delete from usertags.usertags where tags=$1', [
+    deletingTagId,
+  ]);
+  await db.query('Commit');
+
+  return res.status(200).json({
+    statuc: 'success',
+  });
+});
