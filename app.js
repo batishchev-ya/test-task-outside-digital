@@ -20,12 +20,6 @@ app.use('/api/v1/tag', tagRouter);
 app.use('/api/v1/user/tag', userTagsRouter);
 app.use('/api/v1/', userRouter);
 
-app.get('/hello', (req, res, next) => {
-  return res.status(200).json({
-    message: 'hello from my seerver!',
-  });
-});
-
 app.all('*', (req, res, next) => {
   return next(
     new AppError({
