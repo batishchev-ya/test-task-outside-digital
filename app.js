@@ -1,5 +1,7 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
+const cors = require('cors');
+
 const userRouter = require('./routes/userRoutes');
 const tagRouter = require('./routes/tagRoutes');
 const userTagsRouter = require('./routes/userTagsRouter');
@@ -12,10 +14,17 @@ const app = express();
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
+app.use(cors());
 
 app.use('/api/v1/tag', tagRouter);
 app.use('/api/v1/user/tag', userTagsRouter);
 app.use('/api/v1/', userRouter);
+
+app.get('/hello', (req, res, next) => {
+  return res.status(200).json({
+    message: 'hello from my seerver!',
+  });
+});
 
 app.all('*', (req, res, next) => {
   return next(
