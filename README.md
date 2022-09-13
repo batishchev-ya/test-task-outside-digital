@@ -1,6 +1,6 @@
-# Test Task for Digital Outside
+# Educational project implementing basic CRUD operations
 
-This is test project implemeting basic CRUD operations for three tables: Users, Tags, Usertags using Node.js and PostgreSQL with authentication and authorization.
+This is educational project implemeting basic CRUD operations for three tables: Users, Tags, Usertags using Node.js and PostgreSQL with authentication and authorization.
 
 ## Getting start
 
@@ -36,6 +36,8 @@ npm run
 ```
 
 ### API endpoints
+
+Main endpoint for API features is /api/v1
 
 - POST /signin
 
