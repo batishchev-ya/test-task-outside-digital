@@ -6,7 +6,8 @@ const router = express.Router();
 
 router.post('/signin', authController.signin);
 router.post('/login', authController.login);
-router.post('/logout', authController.logout);
+router.get('/logout', authController.logout);
+router.get('/refresh', authController.refresh);
 
 router.use(authController.protect);
 router
@@ -14,6 +15,7 @@ router
   .get(userController.getUser)
   .put(userController.updateUser)
   .delete(userController.deleteUser);
+
 // router.route('/test').get(authController.protect, (req, res) => {
 //   return res.status(200).json({
 //     message: 'succesfull',

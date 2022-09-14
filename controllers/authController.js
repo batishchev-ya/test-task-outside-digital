@@ -11,16 +11,34 @@ const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const db = require('../db/index');
 
-const signToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN,
+const signToken = (id, secret, expiresIn) => {
+  return jwt.sign({ id }, secret, {
+    expiresIn: expiresIn,
   });
 };
 
 const createSendToken = (id, statusCode, req, res) => {
-  const token = signToken(id);
+  const token = signToken(
+    id,
+    process.env.JWT_SECRET,
+    process.env.JWT_EXPIRES_IN
+  );
+
+  const refreshToken = signToken(
+    id,
+    process.env.JWT_REFRESH_SECRET,
+    process.env.JWT_REFRESH_EXPIRES_IN
+  );
 
   res.cookie('jwt', token, {
+    expires: new Date(
+      Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 60 * 1000
+    ),
+    httpOnly: true,
+    secure: req.secure || req.headers['x-forwaded-proto'] === 'https',
+  });
+
+  res.cookie('refreshToken', refreshToken, {
     expires: new Date(
       Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 60 * 1000
     ),
@@ -68,9 +86,9 @@ exports.signin = catchAsync(async (req, res, next) => {
 
       [email, passwordHashed, nickname]
     )
-  ).rows[0].uid;
+  ).rows[0];
 
-  createSendToken(userUid, 200, req, res);
+  createSendToken(userUid.uid, 200, req, res);
 });
 
 exports.login = catchAsync(async (req, res, next) => {
@@ -117,11 +135,15 @@ exports.protect = catchAsync(async (req, res, next) => {
   } else if (req.cookies.jwt) {
     token = req.cookies.jwt;
   }
+
   if (!token) {
     return next(
       new AppError({ message: 'You are not logged in', statusCode: 401 })
     );
   }
+
+  console.log(req.cookies);
+  console.log(token);
 
   const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
 
@@ -136,4 +158,75 @@ exports.protect = catchAsync(async (req, res, next) => {
   }
   req.userUid = userUid.uid;
   next();
+});
+
+exports.refresh = catchAsync(async (req, res, next) => {
+  let refreshToken;
+  let token;
+
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    token = req.headers.authorization.split(' ')[1];
+  } else if (req.cookies.jwt) {
+    token = req.cookies.jwt;
+  }
+
+  if (!token) {
+    return next(
+      new AppError({ message: 'You are not logged in', statusCode: 401 })
+    );
+  }
+
+  if (req.cookies.refreshToken) {
+    refreshToken = req.cookies.refreshToken;
+  }
+
+  if (!refreshToken) {
+    return next(
+      new AppError({
+        message: 'You are not allowed to refresh your session',
+        statusCode: 401,
+      })
+    );
+  }
+
+  try {
+    const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+    console.log(decoded);
+    if (decoded.id) {
+      return res.status(401).json({ message: 'You are still logged in' });
+
+      // return next(
+      //   new AppError({ message: 'You are still logged in', statusCode: 400 })
+      // );
+    }
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      try {
+        const decodedRefresh = await promisify(jwt.verify)(
+          refreshToken,
+          process.env.JWT_REFRESH_SECRET
+        );
+
+        const userUid = (
+          await db.query('select uid from usertags.users where uid=$1', [
+            decodedRefresh.id,
+          ])
+        ).rows[0];
+
+        if (!userUid) {
+          return next(
+            new AppError({ message: 'User has been deleted', statusCode: 404 })
+          );
+        }
+        console.log(userUid.uid);
+        req.userUid = userUid.uid;
+        createSendToken(userUid.uid, 200, req, res);
+      } catch (err) {
+        console.log(err);
+      }
+    }
+  }
 });
