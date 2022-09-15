@@ -24,6 +24,27 @@ const createSendToken = (id, statusCode, req, res) => {
     process.env.JWT_EXPIRES_IN
   );
 
+  res.cookie('jwt', token, {
+    expires: new Date(
+      Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 60 * 1000
+    ),
+    httpOnly: true,
+    secure: req.secure || req.headers['x-forwaded-proto'] === 'https',
+  });
+
+  res.status(statusCode).json({
+    token,
+    expiresIn: process.env.JWT_COOKIE_EXPIRES_IN * 60 * 1000,
+  });
+};
+
+const createSendAllTokens = (id, statusCode, req, res) => {
+  const token = signToken(
+    id,
+    process.env.JWT_SECRET,
+    process.env.JWT_EXPIRES_IN
+  );
+
   const refreshToken = signToken(
     id,
     process.env.JWT_REFRESH_SECRET,
@@ -88,7 +109,7 @@ exports.signin = catchAsync(async (req, res, next) => {
     )
   ).rows[0];
 
-  createSendToken(userUid.uid, 200, req, res);
+  createSendAllTokens(userUid.uid, 200, req, res);
 });
 
 exports.login = catchAsync(async (req, res, next) => {
@@ -112,7 +133,7 @@ exports.login = catchAsync(async (req, res, next) => {
       new AppError({ message: 'Incorrect email or password', statusCode: 401 })
     );
   }
-  createSendToken(user.uid, 200, req, res);
+  createSendAllTokens(user.uid, 200, req, res);
 });
 
 exports.logout = (req, res) => {
@@ -142,6 +163,7 @@ exports.protect = catchAsync(async (req, res, next) => {
     );
   }
 
+  console.log(req.headers.authorization);
   console.log(req.cookies);
   console.log(token);
 
@@ -161,6 +183,7 @@ exports.protect = catchAsync(async (req, res, next) => {
 });
 
 exports.refresh = catchAsync(async (req, res, next) => {
+  // TODO: refactor this function and add onde more check: if refreshToken has expired
   let refreshToken;
   let token;
 
@@ -195,13 +218,12 @@ exports.refresh = catchAsync(async (req, res, next) => {
   try {
     const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
     console.log(decoded);
-    if (decoded.id) {
-      return res.status(401).json({ message: 'You are still logged in' });
-
-      // return next(
-      //   new AppError({ message: 'You are still logged in', statusCode: 400 })
-      // );
-    }
+    // if (decoded.id) {
+    return res.status(200).json({ token });
+    console.log(res.cookie);
+    // return next(
+    //   new AppError({ message: 'You are still logged in', statusCode: 400 })
+    // );
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
       try {
@@ -225,7 +247,14 @@ exports.refresh = catchAsync(async (req, res, next) => {
         req.userUid = userUid.uid;
         createSendToken(userUid.uid, 200, req, res);
       } catch (err) {
-        console.log(err);
+        if (err.name === 'TokenExpiredError') {
+          return next(
+            new AppError({ message: 'Please log in again', statusCode: 401 })
+          );
+        }
+        return next(
+          new AppError({ message: 'Somethimg went wrong', statusCode: 500 })
+        );
       }
     }
   }
